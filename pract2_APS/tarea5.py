@@ -87,8 +87,6 @@ i2c = I2C(0, scl=Pin(19), sda=Pin(18))
 
 pin_for_INT = Pin(12, Pin.IN)
 
-print(pin_for_INT.value()) # Inicia con 0
-
 device = i2c.scan()
 array_bytes = bytearray([0x01])
 i2c.writeto_mem(device[0], 0x6b, array_bytes)
