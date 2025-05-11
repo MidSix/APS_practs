@@ -17,17 +17,22 @@ PWD = b'C6VsKk2B'
 net = net.Net(SSID, '', PWD)
 profiler = profiler.Profiler()
 buffer = bytearray([])
+
+sck_pin = Pin(15)    # Serial clock output
+ws_pin =  Pin(2)     # Word clock output
+sd_pin =  Pin(13)    # Serial data output
+
+process_buf = bytearray((N_SAMPLES*4)) #A esta vaina le pasamos como input el int 8192, vale. Lo que va a hacer es convertir ese número en un
+#array de bytes, o sea, va a crear un array con 8192 bytes completamente vacíos, nosotros los llenaremos después con i2s.readinto() porque
+#ese método dentro de su implementación modifica este array copiándole los elementos del buffer interno del i2c que es donde llega lo que capta el micrófono.
+
 # bucle principal
 while True:
     # queda en espera de los parámetros de captura a través de la red
     sample_rate, duration, h = net.get_params()
     print(f'Solicitud: fs={sample_rate}Hz; t={duration}s; h=[{h[0]}...] ({len(h)} taps)')
     # ... COMPLETAR ...
-    # inicializa I2S
-    sck_pin = Pin(15)    # Serial clock output
-    ws_pin =  Pin(2)     # Word clock output
-    sd_pin =  Pin(13)    # Serial data output
-    
+    # inicializa I2S   
     i2s = I2S(0,
                sck=sck_pin, ws=ws_pin, sd=sd_pin,
                mode=I2S.RX,
@@ -36,9 +41,6 @@ while True:
                rate=sample_rate,
                ibuf=N_SAMPLES*4*2)
     
-    process_buf = bytearray((N_SAMPLES*4)) #A esta vaina le pasamos como input el int 8192, vale. Lo que va a hacer es convertir ese número en un
-    #array de bytes, o sea, va a crear un array con 8192 bytes completamente vacíos, nosotros los llenaremos después con i2s.readinto() porque
-    #ese método dentro de su implementación modifica este array copiándole los elementos del buffer interno del i2c que es donde llega lo que capta el micrófono.
     n_muestras_capturar = duration * sample_rate
     n_bytes_leidos = 0
     n_muestras_leidas = 0

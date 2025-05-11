@@ -14,14 +14,16 @@ PWD = b'C6VsKk2B'
 net = net.Net(SSID, '', PWD)
 profiler = profiler.Profiler()
 buffer = bytearray([])
+
+sck_pin = Pin(15)
+ws_pin =  Pin(2)
+sd_pin =  Pin(13)
+process_buf = bytearray((N_SAMPLES*4))
+
 while True:
     sample_rate, duration, h = net.get_params()
     filter_coefficients = len(h)    
     print(f'Solicitud: fs={sample_rate}Hz; t={duration}s; h=[{h[0]}...] ({len(h)} taps)')
-
-    sck_pin = Pin(15)
-    ws_pin =  Pin(2)
-    sd_pin =  Pin(13)
     
     i2s = I2S(0,
                sck=sck_pin, ws=ws_pin, sd=sd_pin,
@@ -31,7 +33,6 @@ while True:
                rate=sample_rate,
                ibuf=N_SAMPLES*4*2)
     
-    process_buf = bytearray((N_SAMPLES*4))
     n_muestras_capturar = duration * sample_rate
     n_bytes_leidos = 0
     n_muestras_leidas = 0

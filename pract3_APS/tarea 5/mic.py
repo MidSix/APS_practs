@@ -7,7 +7,8 @@ from machine import I2S, Pin
 import net
 import profiler
 
-N_SAMPLES = const(2048)
+#N_SAMPLES = const(2048) no necesario
+
 SSID = b'Avatel-gF3P'
 PWD = b'C6VsKk2B'
 
@@ -18,12 +19,12 @@ buffer = bytearray([])
 sck_pin = Pin(15)
 ws_pin =  Pin(2)
 sd_pin =  Pin(13)
-process_buf = bytearray((N_SAMPLES*4))
 
 while True:
-    sample_rate, duration, h = net.get_params()
-    filter_coefficients = len(h)    
-    print(f'Solicitud: fs={sample_rate}Hz; t={duration}s; h=[{h[0]}...] ({len(h)} taps)')
+    sample_rate, bsize, h = net.get_params()
+    filter_coefficients = len(h)
+    print(filter_coefficients)
+    print(f'Solicitud: fs={sample_rate}Hz; buffer_size={bsize}s; h=[{h[0]}...] ({len(h)} taps)')
     
     i2s = I2S(0,
                sck=sck_pin, ws=ws_pin, sd=sd_pin,
@@ -31,60 +32,70 @@ while True:
                bits=32,
                format=I2S.MONO,
                rate=sample_rate,
-               ibuf=N_SAMPLES*4*2)
+               ibuf=bsize*4*2)
     
-    n_muestras_capturar = duration * sample_rate
-    n_bytes_leidos = 0
-    n_muestras_leidas = 0
+    process_buf = bytearray((bsize * 4))
+    #n_muestras_capturar = duration * sample_rate / no necesario
+    #n_bytes_leidos = 0 / no necesario
+    #n_muestras_leidas = 0 / no necesario
     
     time.sleep(1)
 
     print("==========  COMENZANDO GRABACIÓN ==========")
-    
     previous_last_samples = np.zeros(filter_coefficients - 1)
     while True:
         
         t0 = time.ticks_us()
-        n_bytes_leidos = i2s.readinto(process_buf)
+        
+        #n_bytes_leidos = i2s.readinto(process_buf) no se necesita los bytes que retorna readinto
+        
+        i2s.readinto(process_buf)
         t1 = time.ticks_us()
-        n_muestras_leidas += (n_bytes_leidos // 4)   
+        
+        #n_muestras_leidas += (n_bytes_leidos // 4) no se necesita
+        
         signal = utils.from_int32_buffer(process_buf)
         signal = np.array(signal / 2**15)
-
+        
         if filter_coefficients == 1:
-            signal = np.convolve(signal , h)
+            signal = np.convolve(signal,h)
             t2 = time.ticks_us()
-            signal = np.array(signal, dtype = np.int16)
-            net.send(signal)
+            signal_spectrogram = utils.spectrogram(signal)
             t3 = time.ticks_us()
             profiler.print_partial(t0, t1, t2, t3)
-            for byte in range(16):
-                print(f"Byte {byte}: {process_buf[byte]}", end=" ")
-            print()
-            if n_muestras_capturar <= n_muestras_leidas:
+            if net.send(signal_spectrogram) == 0:
                 break
             continue
-
+        
         temp = signal.copy()
         signal = np.concatenate((previous_last_samples, signal))
+        print(signal.shape)
         signal = np.convolve(signal , h)
         t2 = time.ticks_us()
         signal = signal[filter_coefficients - 1: -(filter_coefficients - 1)]
         previous_last_samples = temp[-(filter_coefficients - 1):]
-        signal = np.array(signal, dtype = np.int16)
-        net.send(signal)
+        
+        #signal = np.array(signal, dtype = np.int16) / no necesario
+        
+        #net.send(signal) cambiamos lo que se le envia a send
+        signal_spectrogram = utils.spectrogram(signal)
         t3 = time.ticks_us()
         profiler.print_partial(t0, t1, t2, t3)
+        
         for byte in range(16):
             print(f"Byte {byte}: {process_buf[byte]}", end=" ")
         print()
-        
-        if n_muestras_capturar <= n_muestras_leidas:
+        if net.send(signal_spectrogram) == 0:
             break
+        
+        #if n_muestras_capturar <= n_muestras_leidas: no se necesita
+            #break
+        
     print("Average:")
     profiler.print_average()
     print("==========  GRABACIÓN FINALIZADA ==========")
     profiler.print_average()
     net.close()
+
 
 
